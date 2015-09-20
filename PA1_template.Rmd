@@ -5,21 +5,120 @@ output:
     keep_md: true
 ---
 
+```{r setoptions}
+library(knitr)
+opts_chunk$set(echo = TRUE)
+```
 
 ## Loading and preprocessing the data
-
-
+```{r preprocessing}
+activities <- read.csv("activity.csv")
+head(activities)
+```
 
 ## What is mean total number of steps taken per day?
+```{r meanTotalSteps}
+date <- factor(activities$date)
+stepsByDate <- split(activities$steps, date)
+sumStepsByDate <- as.numeric(lapply(stepsByDate, sum, na.rm = TRUE))
+mean <- mean(sumStepsByDate)
+med <- median(sumStepsByDate)
+hist(sumStepsByDate, col = "green", xlab = "total number of steps", 
+     main = "Histogram of total number of steps")
+```
 
+The mean of total number of steps is `r mean`.
 
+The medium of total number of steps is `r med`.
 
 ## What is the average daily activity pattern?
 
+```{r averageDailyActivity}
+interval <- factor(activities$interval)
+stepsByInterval <- split(activities$steps, interval)
+meanStepsByInterval <- as.numeric(lapply(stepsByInterval, mean, na.rm = TRUE))
+maxInterval <- which.max(meanStepsByInterval)
+plot(meanStepsByInterval, type = "l", xlab = "Interval index", ylab = "Mean steps")
+```
 
+* The 5-minute interval, which contains the maximum number of steps is `r maxInterval`.
 
 ## Imputing missing values
 
+```{r imputingMissingValues}
+activities <- read.csv("activity.csv")
+# Get the total number of NAs in the dataset
+numOfNAs <- sum(is.na(activities$steps))
+# Filling in missing values
+# Replace the NA with the mean of that day
+date <- factor(activities$date)
+stepsByDate <- split(activities$steps, date)
+meanStepsByDate <- as.numeric(lapply(stepsByDate, mean, na.rm = TRUE))
+meanStepsByDate[is.nan(meanStepsByDate)] <- 0
+newSteps <- c()
+for (i in 1:length(stepsByDate)) {
+    s <- as.vector(stepsByDate[[i]])
+    s[is.na(s)]  <- meanStepsByDate[i]
+    newSteps <- c(newSteps, s)
+}
 
+activities <- transform(activities, steps = newSteps)
+stepsByDate <- split(activities$steps, date)
+sumStepsByDate <- as.numeric(lapply(stepsByDate, sum))
+mean <- mean(sumStepsByDate)
+med <- median(sumStepsByDate)
+hist(sumStepsByDate, col = "green", xlab = "total number of steps", 
+     main = "Histogram of total number of steps after imputing")
+```
+
+The total number of missing values in the dataset is `r numOfNAs`
+
+The mean of total number of steps after imputing missing values is `r mean`.
+
+The medium of total number of steps after imputing missing values is `r med`.
+
+These two values are exactly the same as part 1. My conclusion is that if we use
+the mean for that day to replace the missing value of that day, there is no impact of
+imputing missing data.
 
 ## Are there differences in activity patterns between weekdays and weekends?
+```{r weekday}
+date <- activities$date
+weekday <- weekdays(as.Date(date))
+weekday[weekday == "Saturday" | weekday == "Sunday"] <- "weekend"
+weekday[weekday != "weekend"] <- "weekday"
+activities <- transform(activities, weekday = weekday)
+weekdayActivities <- activities[activities$weekday == "weekday",]
+weekendActivities <- activities[activities$weekday == "weekend",]
+
+interval <- factor(weekdayActivities$interval)
+weekdayStepsByInterval <- split(weekdayActivities$steps, interval)
+weekdayMeanStepsByInterval <- as.numeric(lapply(weekdayStepsByInterval, mean))
+
+interval <- factor(weekendActivities$interval)
+weekendStepsByInterval <- split(weekendActivities$steps, interval)
+weekendMeanStepsByInterval <- as.numeric(lapply(weekendStepsByInterval, mean))
+
+interval <- unique(activities$interval)
+weekday <- rep("weekend", length(weekendMeanStepsByInterval))
+weekendMeanActivities <- data.frame(steps = weekendMeanStepsByInterval,
+                                    interval = interval,
+                                    weekday = weekday)
+
+weekday <- rep("weekday", length(weekdayMeanStepsByInterval))
+weekdayMeanActivities <- data.frame(steps = weekdayMeanStepsByInterval,
+                                    interval = interval,
+                                    weekday =  weekday)
+
+meanActivities <- rbind(weekendMeanActivities, weekdayMeanActivities)
+
+library(lattice)
+with(
+  meanActivities,
+  xyplot(steps ~ interval | weekday, type = "l", layout=c(1,2),
+         xlab = "5 min interval", main = "Comparison of Activity on Weekdays vs Weekends")
+)
+```
+
+My conclusion is that there is difference between weekday and weekend activities.
+It seems that weekdays are more active.
